@@ -1,0 +1,9 @@
+{
+  "name": "restaurant-saas",
+  "private": true,
+  "scripts": {
+    "dev:api": "pnpm --filter api start:dev",
+    "dev:web": "pnpm --filter web dev",
+    "test": "pnpm -r test"
+  }
+}
