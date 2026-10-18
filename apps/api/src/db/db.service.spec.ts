@@ -1,5 +1,5 @@
 import { afterAll, describe, expect, it } from 'vitest';
-import { DbService } from './db.service';
+import { DbService } from './db.service.js';
 
 const db = new DbService();
 afterAll(() => db.onModuleDestroy());
