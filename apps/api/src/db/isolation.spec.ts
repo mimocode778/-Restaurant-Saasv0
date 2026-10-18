@@ -1,7 +1,7 @@
 import { Client } from 'pg';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
-const URL = process.env.DATABASE_URL ?? 'postgresql://app:app@localhost:5433/restaurant';
+const URL = process.env.DATABASE_URL ?? 'postgresql://app:app@localhost:15432/restaurant';
 
 let client: Client;
 beforeAll(async () => {

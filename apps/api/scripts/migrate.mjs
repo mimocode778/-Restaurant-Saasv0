@@ -4,7 +4,7 @@ import { fileURLToPath } from 'node:url';
 import pg from 'pg';
 
 const dir = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'db', 'migrations');
-const url = process.env.DATABASE_URL ?? 'postgresql://app:app@localhost:5433/restaurant';
+const url = process.env.DATABASE_URL ?? 'postgresql://app:app@localhost:15432/restaurant';
 
 const client = new pg.Client({ connectionString: url });
 await client.connect();

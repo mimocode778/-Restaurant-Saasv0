@@ -6,7 +6,7 @@ services:
       POSTGRES_PASSWORD: app
       POSTGRES_DB: restaurant
     ports:
-      - "5433:5432"
+      - "127.0.0.1:15432:5432"
     volumes:
       - dbdata:/var/lib/postgresql/data
 volumes:
