@@ -1,12 +1,12 @@
 import { Controller, Get } from '@nestjs/common';
-import { AppService } from './app.service.js';
+import { Public } from './auth/auth.guard.js';
 
 @Controller()
 export class AppController {
-  constructor(private readonly appService: AppService) {}
-
+  // Lets a monitoring tool (or you, in a browser) check that the API is running.
+  @Public()
   @Get()
-  getHello(): string {
-    return this.appService.getHello();
+  health() {
+    return { status: 'ok' };
   }
 }

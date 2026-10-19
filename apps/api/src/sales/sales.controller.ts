@@ -1,8 +1,9 @@
-import { BadRequestException, Body, Controller, Get, Headers, Inject, Post, Query } from '@nestjs/common';
+import { Body, Controller, ForbiddenException, Get, Inject, Post, Query } from '@nestjs/common';
 import { z } from 'zod';
+import type { SessionUser } from '../auth/auth.repository.js';
+import { CurrentUser } from '../auth/auth.guard.js';
+import { parse } from '../common/validation.js';
 import { SalesService } from './sales.service.js';
-
-const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 // A single event above 1,000,000 TND is almost certainly a typing mistake.
 const MAX_MILLIMES = 1_000_000_000;
@@ -22,24 +23,9 @@ const CreateSale = z
 
 const Day = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Day must look like 2026-10-19');
 
-function parse<T>(schema: z.ZodType<T>, value: unknown): T {
-  const result = schema.safeParse(value);
-  if (!result.success) {
-    throw new BadRequestException({
-      message: 'Invalid request',
-      issues: result.error.issues.map((i) => ({ path: i.path.join('.'), message: i.message })),
-    });
-  }
-  return result.data;
-}
-
-// TEMPORARY: the restaurant comes from a header the client controls. This is NOT secure.
-// It will be replaced by the restaurant of the logged-in user.
-function restaurantFrom(header: unknown): string {
-  if (typeof header !== 'string' || !UUID.test(header)) {
-    throw new BadRequestException('Missing or invalid x-restaurant-id header');
-  }
-  return header;
+// A void, discount or refund takes money back: only an owner or manager may record one.
+function mayRecord(user: SessionUser, kind: string): boolean {
+  return kind === 'sale' || user.role === 'owner' || user.role === 'manager';
 }
 
 function todayInTunis(): string {
@@ -51,10 +37,13 @@ export class SalesController {
   constructor(@Inject(SalesService) private readonly sales: SalesService) {}
 
   @Post()
-  async create(@Headers('x-restaurant-id') restaurantHeader: unknown, @Body() body: unknown) {
-    const restaurantId = restaurantFrom(restaurantHeader);
+  async create(@CurrentUser() user: SessionUser, @Body() body: unknown) {
     const input = parse(CreateSale, body);
-    return this.sales.record(restaurantId, {
+    if (!mayRecord(user, input.kind)) {
+      throw new ForbiddenException('Only an owner or manager can record a void, discount or refund');
+    }
+    // The restaurant always comes from the login, never from the request.
+    return this.sales.record(user.restaurantId, {
       occurredAt: new Date(input.occurredAt),
       kind: input.kind,
       amountMillimes: input.amountMillimes,
@@ -64,9 +53,8 @@ export class SalesController {
   }
 
   @Get('summary')
-  async summary(@Headers('x-restaurant-id') restaurantHeader: unknown, @Query('day') day?: unknown) {
-    const restaurantId = restaurantFrom(restaurantHeader);
+  async summary(@CurrentUser() user: SessionUser, @Query('day') day?: unknown) {
     const wanted = day === undefined ? todayInTunis() : parse(Day, day);
-    return this.sales.summary(restaurantId, wanted);
+    return this.sales.summary(user.restaurantId, wanted);
   }
 }

@@ -5,6 +5,9 @@
     "dev:api": "pnpm --filter api start:dev",
     "dev:web": "pnpm --filter web dev",
     "test": "pnpm --filter @app/shared build && pnpm -r test",
-    "build:shared": "pnpm --filter @app/shared build"
+    "build:shared": "pnpm --filter @app/shared build",
+    "test:e2e": "pnpm --filter @app/shared build && pnpm --filter api test:e2e",
+    "db:migrate": "pnpm --filter api db:migrate",
+    "create-owner": "pnpm --filter api create-owner"
   }
 }

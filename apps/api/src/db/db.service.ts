@@ -49,6 +49,17 @@ export class DbService implements OnModuleDestroy {
     if (!UUID.test(restaurantId)) {
       throw new Error('Invalid restaurant id');
     }
+    return this.transaction(restaurantId.toLowerCase(), work);
+  }
+
+  // Runs `work` as one transaction with NO restaurant selected: row-level security hides
+  // every tenant row. Only used for login, where the restaurant is not known yet; the
+  // login functions in the database are the only way to reach the data needed.
+  async withoutRestaurant<T>(work: (client: PoolClient) => Promise<T>): Promise<T> {
+    return this.transaction(null, work);
+  }
+
+  private async transaction<T>(restaurantId: string | null, work: (client: PoolClient) => Promise<T>): Promise<T> {
     await this.ensureSafeRole();
 
     const client = await this.pool.connect();
@@ -56,7 +67,7 @@ export class DbService implements OnModuleDestroy {
     try {
       await client.query('begin');
       // `true` = only valid until the end of this transaction, so it can't leak to the next request.
-      await client.query(`select set_config('app.restaurant_id', $1, true)`, [restaurantId.toLowerCase()]);
+      await client.query(`select set_config('app.restaurant_id', $1, true)`, [restaurantId ?? '']);
       const result = await work(client);
       await client.query('commit');
       return result;
