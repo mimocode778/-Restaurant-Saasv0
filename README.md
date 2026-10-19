@@ -39,4 +39,17 @@ pnpm audit                   # check the libraries for known security problems
   `POST /staff/:id/reset-pin`; owners also `reset-password` and `reset-two-step`.
 - Only an owner or manager can record a void, discount or refund.
 
+## Menu and prices
+
+- Prices are entered **including VAT**, in millimes: 12,500 TND is `12500`.
+- Each dish has its own VAT rate in **basis points**: 19 % is `1900`, 7 % is `700`.
+  The software does not fix the rate; confirm the right one with an accountant.
+- The answer always shows the price before VAT (`htMillimes`) and the VAT
+  (`vatMillimes`); the two always add up exactly to the price.
+- Everyone reads the menu (`GET /menu`); owners and managers change it:
+  `POST /menu/categories`, `PATCH /menu/categories/:id`, `POST /menu/categories/:id/archive`,
+  `POST /menu/items`, `PATCH /menu/items/:id`, `POST /menu/items/:id/price`,
+  `GET /menu/items/:id/prices` (history), `POST /menu/items/:id/archive|restore`.
+- Dishes are archived, never deleted, and a price change never erases the old price.
+
 **Read [SECURITY.md](SECURITY.md) before putting the software on a real server.**

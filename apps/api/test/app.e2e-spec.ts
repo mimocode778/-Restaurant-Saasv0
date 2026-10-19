@@ -72,6 +72,7 @@ function http(ip = newIp()) {
   return {
     get: (u: string) => wrap(agent.get(u)),
     post: (u: string) => wrap(agent.post(u)),
+    patch: (u: string) => wrap(agent.patch(u)),
     options: (u: string) => wrap(agent.options(u)),
   };
 }
@@ -377,5 +378,56 @@ describe('login history', () => {
     const t = await login('x@test.tn');
     const events = (await http().get('/auth/events').set(bearer(t)).expect(200)).body;
     expect(events.every((e: { fullName: string | null }) => e.fullName === 'Owner')).toBe(true);
+  });
+});
+
+describe('menu and prices', () => {
+  it('owners build the menu, waiters read it, prices keep their history', async () => {
+    await createOwner('Resto M', 'm@test.tn');
+    const owner = bearer(await login('m@test.tn'));
+
+    const { id: plats } = (await http().post('/menu/categories').set(owner).send({ name: 'Plats', position: 1 }).expect(201)).body;
+    await http().post('/menu/categories').set(owner).send({ name: 'plats' }).expect(409);
+    const { id: couscous } = (
+      await http().post('/menu/items').set(owner).send({ categoryId: plats, name: 'Couscous poisson', priceTtcMillimes: 11_900, vatRateBp: 1900 }).expect(201)
+    ).body;
+    await http().post('/menu/items').set(owner).send({ categoryId: plats, name: 'Bad', priceTtcMillimes: 11.9, vatRateBp: 1900 }).expect(400);
+    await http().post('/menu/items').set(owner).send({ categoryId: plats, name: 'Bad', priceTtcMillimes: 1000, vatRateBp: 1900, restaurantId: 'x' }).expect(400);
+
+    // The price is changed through its own route only.
+    await http().patch(`/menu/items/${couscous}`).set(owner).send({ priceTtcMillimes: 1 }).expect(400);
+    await http().patch(`/menu/items/${couscous}`).set(owner).send({ name: 'Couscous au poisson' }).expect(204);
+    expect((await http().post(`/menu/items/${couscous}/price`).set(owner).send({ priceTtcMillimes: 13_500, vatRateBp: 1900 }).expect(200)).body).toEqual({ changed: true });
+    const history = (await http().get(`/menu/items/${couscous}/prices`).set(owner).expect(200)).body;
+    expect(history.map((h: { priceTtcMillimes: number }) => h.priceTtcMillimes).sort()).toEqual([11_900, 13_500]);
+
+    const waiter = (await http().post('/staff').set(owner).send({ fullName: 'Amine', role: 'waiter', pin: '2468' }).expect(201)).body;
+    const { deviceToken } = (await http().post('/auth/devices').set(owner).send({ name: 'Salle' }).expect(201)).body;
+    const asWaiter = bearer((await http().post('/auth/pin-login').set('x-device-token', deviceToken).send({ userId: waiter.id, pin: '2468' }).expect(200)).body.token);
+
+    const menu = (await http().get('/menu').set(asWaiter).expect(200)).body;
+    expect(menu[0].items[0]).toMatchObject({ name: 'Couscous au poisson', price: { priceTtcMillimes: 13_500, vatRateBp: 1900 } });
+    await http().post('/menu/categories').set(asWaiter).send({ name: 'Nope' }).expect(403);
+    await http().post(`/menu/items/${couscous}/price`).set(asWaiter).send({ priceTtcMillimes: 1, vatRateBp: 0 }).expect(403);
+
+    // Archived dishes disappear from the menu; waiters never see them.
+    await http().post(`/menu/items/${couscous}/archive`).set(owner).expect(204);
+    expect((await http().get('/menu').set(asWaiter).expect(200)).body[0].items).toEqual([]);
+    expect((await http().get('/menu?archived=true').set(asWaiter).expect(200)).body[0].items).toEqual([]);
+    expect((await http().get('/menu?archived=true').set(owner).expect(200)).body[0].items).toHaveLength(1);
+  });
+
+  it('another restaurant cannot see or change this menu', async () => {
+    await createOwner('Resto N1', 'n1@test.tn');
+    await createOwner('Resto N2', 'n2@test.tn');
+    const n1 = bearer(await login('n1@test.tn'));
+    const n2 = bearer(await login('n2@test.tn'));
+    const { id: cat } = (await http().post('/menu/categories').set(n1).send({ name: 'Secrets' }).expect(201)).body;
+    const { id: item } = (await http().post('/menu/items').set(n1).send({ categoryId: cat, name: 'Recette', priceTtcMillimes: 5000, vatRateBp: 1900 }).expect(201)).body;
+
+    expect((await http().get('/menu').set(n2).expect(200)).body).toEqual([]);
+    await http().patch(`/menu/items/${item}`).set(n2).send({ name: 'Volé' }).expect(404);
+    await http().post(`/menu/items/${item}/price`).set(n2).send({ priceTtcMillimes: 1, vatRateBp: 0 }).expect(404);
+    await http().post('/menu/items').set(n2).send({ categoryId: cat, name: 'Intrus', priceTtcMillimes: 1000, vatRateBp: 1900 }).expect(400);
   });
 });
