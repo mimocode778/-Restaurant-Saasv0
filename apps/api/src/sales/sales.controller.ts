@@ -1,4 +1,4 @@
-import { Body, Controller, ForbiddenException, Get, Inject, Post, Query } from '@nestjs/common';
+import { BadRequestException, Body, ConflictException, Controller, ForbiddenException, Get, Inject, Post, Query } from '@nestjs/common';
 import { z } from 'zod';
 import type { SessionUser } from '../auth/auth.repository.js';
 import { CurrentUser } from '../auth/auth.guard.js';
@@ -8,17 +8,22 @@ import { SalesService } from './sales.service.js';
 // A single event above 1,000,000 TND is almost certainly a typing mistake.
 const MAX_MILLIMES = 1_000_000_000;
 
-// strictObject: unknown fields (like "source" or "restaurantId") are rejected, not ignored.
+// strictObject: unknown fields (like "source", "restaurantId" or "occurredAt") are rejected.
+// There is no time field on purpose: the server's clock sets the time of every sale.
 const CreateSale = z
   .strictObject({
-    occurredAt: z.string().datetime({ offset: true }),
     kind: z.enum(['sale', 'void', 'discount', 'refund']),
     amountMillimes: z.number().int().min(-MAX_MILLIMES).max(MAX_MILLIMES),
+    refersTo: z.uuid().optional(),
     externalRef: z.string().min(1).max(100).optional(),
   })
   .refine((s) => (s.kind === 'sale' ? s.amountMillimes >= 0 : s.amountMillimes <= 0), {
     message: 'A sale must not be negative; a void, discount or refund must not be positive',
     path: ['amountMillimes'],
+  })
+  .refine((s) => (s.kind === 'sale') === (s.refersTo === undefined), {
+    message: 'A void, discount or refund must give the sale it refers to (refersTo); a sale must not',
+    path: ['refersTo'],
   });
 
 const Day = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Day must look like 2026-10-19');
@@ -42,14 +47,23 @@ export class SalesController {
     if (!mayRecord(user, input.kind)) {
       throw new ForbiddenException('Only an owner or manager can record a void, discount or refund');
     }
-    // The restaurant always comes from the login, never from the request.
-    return this.sales.record(user.restaurantId, {
-      occurredAt: new Date(input.occurredAt),
-      kind: input.kind,
-      amountMillimes: input.amountMillimes,
-      source: 'manual',
-      externalRef: input.externalRef,
-    });
+    // The restaurant and the person always come from the login, never from the request.
+    try {
+      return await this.sales.record(user.restaurantId, {
+        kind: input.kind,
+        amountMillimes: input.amountMillimes,
+        source: 'manual',
+        recordedBy: user.userId,
+        refersTo: input.refersTo,
+        externalRef: input.externalRef,
+      });
+    } catch (err) {
+      const e = err as { code?: string; message?: string };
+      // Rules checked by the database itself (see 007_sales_trust.sql).
+      if (e.code === '23503') throw new BadRequestException('The original sale was not found');
+      if (e.code === '23514') throw new ConflictException(e.message);
+      throw err;
+    }
   }
 
   @Get('summary')

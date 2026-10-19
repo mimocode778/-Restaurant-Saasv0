@@ -82,7 +82,7 @@ const bearer = (t: string) => ({ authorization: `Bearer ${t}` });
 async function login(email: string, password = PASSWORD, extra: Record<string, unknown> = {}) {
   return (await http().post('/auth/login').send({ email, password, ...extra }).expect(200)).body.token as string;
 }
-const sale = { occurredAt: '2026-10-19T12:00:00+01:00', kind: 'sale', amountMillimes: 12500 };
+const sale = { kind: 'sale', amountMillimes: 12500 };
 
 describe('the API is closed by default', () => {
   it('answers the health check without login', () => http().get('/').expect(200, { status: 'ok' }));
@@ -129,7 +129,7 @@ describe('owners log in and only ever see their own restaurant', () => {
     const b = await login('b@test.tn');
     await http().post('/sales').set(bearer(a)).send(sale).expect(201);
     await http().post('/sales').set(bearer(b)).send({ ...sale, amountMillimes: 99000 }).expect(201);
-    const summaryA = await http().get('/sales/summary?day=2026-10-19').set(bearer(a)).expect(200);
+    const summaryA = await http().get('/sales/summary').set(bearer(a)).expect(200);
     expect(summaryA.body).toEqual({ tickets: 1, grossMillimes: 12500, netMillimes: 12500 });
   });
 
@@ -295,8 +295,8 @@ describe('waiters on a paired tablet', () => {
     const w = (await http().post('/auth/pin-login').set('x-device-token', deviceToken).send({ userId: waiter.id, pin: '4821' }).expect(200)).body.token;
     const asWaiter = bearer(w);
 
-    await http().post('/sales').set(asWaiter).send(sale).expect(201);
-    await http().post('/sales').set(asWaiter).send({ ...sale, kind: 'refund', amountMillimes: -500 }).expect(403);
+    const waiterSale = (await http().post('/sales').set(asWaiter).send(sale).expect(201)).body;
+    await http().post('/sales').set(asWaiter).send({ kind: 'refund', amountMillimes: -500, refersTo: waiterSale.id }).expect(403);
     await http().get('/staff').set(asWaiter).expect(403);
     await http().get('/auth/events').set(asWaiter).expect(403);
     await http().post('/auth/devices').set(asWaiter).send({ name: 'Mine' }).expect(403);
@@ -471,5 +471,41 @@ describe('dining room layout', () => {
 
     await http().post(`/floor/items/${t1}/archive`).set(owner).expect(204);
     expect((await http().get('/floor').set(owner).expect(200)).body.items).toHaveLength(1);
+  });
+});
+
+describe('trustworthy sales', () => {
+  it('the server sets the time and the person; refunds point to a sale and never exceed it', async () => {
+    await createOwner('Resto Y', 'y@test.tn');
+    const owner = bearer(await login('y@test.tn'));
+
+    // The screen cannot choose the time, the person or the restaurant of a sale.
+    await http().post('/sales').set(owner).send({ ...sale, occurredAt: '2020-01-01T12:00:00Z' }).expect(400);
+    await http().post('/sales').set(owner).send({ ...sale, recordedBy: '33333333-3333-4333-8333-333333333333' }).expect(400);
+
+    const { id } = (await http().post('/sales').set(owner).send({ kind: 'sale', amountMillimes: 10_000 }).expect(201)).body;
+    const row = (await admin.query('select occurred_at > now() - interval \'1 minute\' as fresh, recorded_by from sales_events where id = $1', [id])).rows[0];
+    expect(row.fresh).toBe(true);
+    const me = (await http().get('/auth/me').set(owner).expect(200)).body;
+    expect(row.recorded_by).toBe(me.userId);
+
+    // A refund must say which sale it refers to.
+    await http().post('/sales').set(owner).send({ kind: 'refund', amountMillimes: -1_000 }).expect(400);
+    await http().post('/sales').set(owner).send({ kind: 'refund', amountMillimes: -1_000, refersTo: '33333333-3333-4333-8333-333333333333' }).expect(400);
+    await http().post('/sales').set(owner).send({ kind: 'discount', amountMillimes: -4_000, refersTo: id }).expect(201);
+    await http().post('/sales').set(owner).send({ kind: 'refund', amountMillimes: -6_000, refersTo: id }).expect(201);
+    const tooMuch = await http().post('/sales').set(owner).send({ kind: 'refund', amountMillimes: -1, refersTo: id }).expect(409);
+    expect(tooMuch.body.message).toMatch(/more than the original sale/);
+
+    expect((await http().get('/sales/summary').set(owner).expect(200)).body).toEqual({ tickets: 1, grossMillimes: 10_000, netMillimes: 0 });
+  });
+
+  it('a restaurant cannot refund another restaurant\'s sale', async () => {
+    await createOwner('Resto Y1', 'y1@test.tn');
+    await createOwner('Resto Y2', 'y2@test.tn');
+    const y1 = bearer(await login('y1@test.tn'));
+    const y2 = bearer(await login('y2@test.tn'));
+    const { id } = (await http().post('/sales').set(y1).send(sale).expect(201)).body;
+    await http().post('/sales').set(y2).send({ kind: 'refund', amountMillimes: -1_000, refersTo: id }).expect(400);
   });
 });

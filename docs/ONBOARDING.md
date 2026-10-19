@@ -20,7 +20,7 @@ what comes next. Read it once before your first change.
 | Menu and prices | ✅ Done | Categories, dishes, prices including VAT, VAT rate per dish, price history. |
 | Web screens (French) | ✅ Done | Login, home, menu, staff, tablets, login history, my account, dining room. |
 | Dining room + 3D view | ✅ First version | Room editor (top view, drag and drop) and a low-poly 3D view (Three.js). Tables are always shown "free" for now. |
-| Sales (basic) | 🟡 Started | Recording a sale and the day's totals. No till screen yet. |
+| Sales (basic) | 🟡 Started | Recording a sale (server time, who recorded it) and refunds linked to their sale; the day's totals. No till screen yet. |
 | **Till (caisse)** | ⏳ Waiting | Blocked on the official specification, see section 6. |
 | Offline mode | ⏳ To do | The till must keep working when the internet drops. |
 | Stock | ⏳ To do | Tables exist (`stock_items`, `stock_movements`), no screens or API yet. |
@@ -116,8 +116,11 @@ Each module in `apps/api/src` follows the same pattern:
 2. **The restaurant comes from the login, never from the request.** Every data access goes
    through `db.withRestaurant(user.restaurantId, ...)`. The database also enforces it.
 3. **Sales, stock movements, prices and the login history are never edited or deleted.**
-   A correction is a new row (e.g. a refund is a negative sale). Triggers block edits even
-   for the admin. Tax rules on cash registers require this.
+   A correction is a new row: a void, discount or refund is a negative row that points to
+   the original sale (`refersTo`) and can never exceed it. Triggers block edits even for
+   the admin. Tax rules on cash registers require this.
+3b. **The server sets the time and the person.** A sale typed at the till gets the
+   server's clock and the logged-in user as `recorded_by`; the screen cannot choose them.
 4. **Every route needs a login** unless explicitly marked `@Public()`. Use `@Roles(...)` for
    owner/manager-only actions.
 5. **Validate every input** with a strict zod schema (unknown fields are refused).

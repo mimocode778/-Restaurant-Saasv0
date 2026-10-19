@@ -16,7 +16,8 @@ const person = (role: SessionUser['role']): SessionUser => ({
 });
 const manager = person('manager');
 const waiter = person('waiter');
-const valid = { occurredAt: '2026-10-19T12:00:00+01:00', kind: 'sale', amountMillimes: 12500 };
+const valid = { kind: 'sale', amountMillimes: 12500 };
+const SALE_ID = '33333333-3333-4333-8333-333333333333';
 
 function setup() {
   const service = {
@@ -32,10 +33,11 @@ describe('POST /sales', () => {
     const { controller, service } = setup();
     await controller.create(waiter, valid);
     expect(service.record).toHaveBeenCalledWith(RESTAURANT, {
-      occurredAt: new Date('2026-10-19T12:00:00+01:00'),
       kind: 'sale',
       amountMillimes: 12500,
       source: 'manual',
+      recordedBy: waiter.userId,
+      refersTo: undefined,
       externalRef: undefined,
     });
   });
@@ -47,8 +49,11 @@ describe('POST /sales', () => {
     ['a negative sale', manager, { ...valid, amountMillimes: -100 }],
     ['a positive refund', manager, { ...valid, kind: 'refund', amountMillimes: 100 }],
     ['an unknown kind', manager, { ...valid, kind: 'gift' }],
-    ['a date without a time', manager, { ...valid, occurredAt: '2026-10-19' }],
-    ['a null date', manager, { ...valid, occurredAt: null }],
+    ['a time chosen by the screen', manager, { ...valid, occurredAt: '2020-01-01T12:00:00Z' }],
+    ['a refund without the sale it refers to', manager, { kind: 'refund', amountMillimes: -100 }],
+    ['a sale that refers to another sale', manager, { ...valid, refersTo: SALE_ID }],
+    ['a refund referring to something that is not an id', manager, { kind: 'refund', amountMillimes: -100, refersTo: 'abc' }],
+    ['a person chosen by the screen', manager, { ...valid, recordedBy: SALE_ID }],
     ['a client-chosen source', manager, { ...valid, source: 'register' }],
     ['a client-chosen restaurant in the body', manager, { ...valid, restaurantId: RESTAURANT }],
     ['no body at all', manager, undefined],
@@ -62,13 +67,13 @@ describe('POST /sales', () => {
 describe('who may take money back', () => {
   it.each(['void', 'discount', 'refund'])('a waiter cannot record a %s', async (kind) => {
     const { controller, service } = setup();
-    await expect(controller.create(waiter, { ...valid, kind, amountMillimes: -100 })).rejects.toBeInstanceOf(ForbiddenException);
+    await expect(controller.create(waiter, { ...valid, kind, amountMillimes: -100, refersTo: SALE_ID })).rejects.toBeInstanceOf(ForbiddenException);
     expect(service.record).not.toHaveBeenCalled();
   });
 
   it.each(['owner', 'manager'] as const)('a %s can record a refund', async (role) => {
     const { controller, service } = setup();
-    await controller.create(person(role), { ...valid, kind: 'refund', amountMillimes: -100 });
+    await controller.create(person(role), { kind: 'refund', amountMillimes: -100, refersTo: SALE_ID });
     expect(service.record).toHaveBeenCalledOnce();
   });
 });

@@ -28,6 +28,23 @@ describe('cookie settings', () => {
     expect(c).toMatch(/Max-Age=(3599|3600)/);
   });
 
+  it('uses the stronger "__Host-" name in production, with Secure', () => {
+    const saved = process.env.NODE_ENV;
+    process.env.NODE_ENV = 'production';
+    try {
+      const c = sessionCookie(TOKEN, new Date(Date.now() + 3600_000));
+      expect(c.startsWith(`__Host-sid=${TOKEN};`)).toBe(true);
+      expect(c).toContain('Secure');
+      expect(c).toContain('Path=/');
+      expect(c).not.toContain('Domain');
+      expect(cookieToken(`__Host-sid=${TOKEN}`)).toBe(TOKEN);
+      // In production, a plain "sid" cookie planted by someone else is ignored.
+      expect(cookieToken(`sid=${TOKEN}`)).toBeNull();
+    } finally {
+      process.env.NODE_ENV = saved;
+    }
+  });
+
   it('logout empties it', () => {
     expect(clearedSessionCookie()).toContain('Max-Age=0');
   });

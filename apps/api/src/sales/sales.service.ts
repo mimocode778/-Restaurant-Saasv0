@@ -7,7 +7,7 @@ export class SalesService {
   // Explicit @Inject keeps injection working in every build and test setup.
   constructor(@Inject(DbService) private readonly db: DbService) {}
 
-  record(restaurantId: string, sale: NewSale): Promise<{ duplicate: boolean }> {
+  record(restaurantId: string, sale: NewSale): Promise<{ duplicate: boolean; id?: string }> {
     return this.db.withRestaurant(restaurantId, (client) => insertSale(client, sale));
   }
 

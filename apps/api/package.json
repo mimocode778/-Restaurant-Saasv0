@@ -21,7 +21,8 @@
     "test:e2e": "vitest run --config ./vitest.config.e2e.ts",
     "db:migrate": "node scripts/migrate.mjs",
     "create-owner": "nest build && node scripts/create-owner.mjs",
-    "reset-owner-password": "nest build && node scripts/reset-owner-password.mjs"
+    "reset-owner-password": "nest build && node scripts/reset-owner-password.mjs",
+    "set-runtime-password": "node scripts/set-runtime-password.mjs"
   },
   "dependencies": {
     "@app/shared": "workspace:*",

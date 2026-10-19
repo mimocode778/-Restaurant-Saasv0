@@ -26,12 +26,14 @@ async function inTransaction(fn: () => Promise<void>) {
 async function seed() {
   const a = (await client.query(`insert into restaurants (name) values ('Resto A') returning id`)).rows[0].id as string;
   const b = (await client.query(`insert into restaurants (name) values ('Resto B') returning id`)).rows[0].id as string;
+  const ua = (await client.query(`insert into users (restaurant_id, full_name, role) values ($1, 'A', 'owner') returning id`, [a])).rows[0].id as string;
+  const ub = (await client.query(`insert into users (restaurant_id, full_name, role) values ($1, 'B', 'owner') returning id`, [b])).rows[0].id as string;
   await client.query(
-    `insert into sales_events (restaurant_id, occurred_at, kind, amount_millimes, source)
-     values ($1, now(), 'sale', 12500, 'manual'), ($2, now(), 'sale', 99000, 'manual')`,
-    [a, b],
+    `insert into sales_events (restaurant_id, occurred_at, kind, amount_millimes, source, recorded_by)
+     values ($1, now(), 'sale', 12500, 'manual', $3), ($2, now(), 'sale', 99000, 'manual', $4)`,
+    [a, b, ua, ub],
   );
-  return { a, b };
+  return { a, b, ua, ub };
 }
 
 // From now on act like the API does: limited role, working for one restaurant.
@@ -61,13 +63,13 @@ describe('tenant isolation', () => {
 
   it('cannot write a sale for another restaurant', () =>
     inTransaction(async () => {
-      const { a, b } = await seed();
+      const { a, b, ub } = await seed();
       await actAs(a);
       await expect(
         client.query(
-          `insert into sales_events (restaurant_id, occurred_at, kind, amount_millimes, source)
-           values ($1, now(), 'sale', 1000, 'manual')`,
-          [b],
+          `insert into sales_events (restaurant_id, occurred_at, kind, amount_millimes, source, recorded_by)
+           values ($1, now(), 'sale', 1000, 'manual', $2)`,
+          [b, ub],
         ),
       ).rejects.toThrow(/row-level security/);
     }));
@@ -96,15 +98,30 @@ describe('append-only tables', () => {
 
   it('even the admin cannot delete stock movements', () =>
     inTransaction(async () => {
-      const { a } = await seed();
+      const { a, ua } = await seed();
       const item = (
         await client.query(`insert into stock_items (restaurant_id, name, base_unit) values ($1, 'Flour', 'g') returning id`, [a])
       ).rows[0].id as string;
       await client.query(
-        `insert into stock_movements (restaurant_id, stock_item_id, occurred_at, kind, quantity_base)
-         values ($1, $2, now(), 'purchase', 25000)`,
-        [a, item],
+        `insert into stock_movements (restaurant_id, stock_item_id, occurred_at, kind, quantity_base, recorded_by)
+         values ($1, $2, now(), 'purchase', 25000, $3)`,
+        [a, item, ua],
       );
       await expect(client.query('delete from stock_movements')).rejects.toThrow(/append-only/);
+    }));
+
+  it('a stock movement must say who recorded it', () =>
+    inTransaction(async () => {
+      const { a } = await seed();
+      const item = (
+        await client.query(`insert into stock_items (restaurant_id, name, base_unit) values ($1, 'Sugar', 'g') returning id`, [a])
+      ).rows[0].id as string;
+      await expect(
+        client.query(
+          `insert into stock_movements (restaurant_id, stock_item_id, occurred_at, kind, quantity_base)
+           values ($1, $2, now(), 'purchase', 1000)`,
+          [a, item],
+        ),
+      ).rejects.toThrow(/recorded_by_required/);
     }));
 });

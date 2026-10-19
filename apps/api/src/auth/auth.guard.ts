@@ -12,7 +12,7 @@ import { Reflector } from '@nestjs/core';
 import { allowedOrigins } from '../config.js';
 import type { Role, SessionUser } from './auth.repository.js';
 import { AuthService, type ClientInfo } from './auth.service.js';
-import { readCookie, SESSION_COOKIE } from './cookies.js';
+import { readCookie, sessionCookieName } from './cookies.js';
 
 // Every route needs a logged-in user, unless it is marked @Public().
 const PUBLIC = 'auth:public';
@@ -54,7 +54,7 @@ export function bearerToken(header: unknown): string | null {
 }
 
 export function cookieToken(header: unknown): string | null {
-  const t = readCookie(header, SESSION_COOKIE);
+  const t = readCookie(header, sessionCookieName());
   return t && TOKEN.test(t) ? t : null;
 }
 

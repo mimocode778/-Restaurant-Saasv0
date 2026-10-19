@@ -14,6 +14,7 @@ import { parseArgs } from 'node:util';
 import pg from 'pg';
 import { MIN_PASSWORD, passwordProblem } from '../dist/auth/password-policy.js';
 import { hashSecret } from '../dist/auth/secrets.js';
+import { adminDatabaseUrl } from './db-url.mjs';
 
 const { values } = parseArgs({ options: { email: { type: 'string' }, 'clear-two-step': { type: 'boolean' } } });
 const email = values.email?.trim().toLowerCase();
@@ -21,6 +22,9 @@ if (!email) {
   console.error('Usage: pnpm --filter api reset-owner-password --email owner@example.tn [--clear-two-step]');
   process.exit(1);
 }
+
+// Checked before asking anything, so nothing is typed for nothing.
+const dbUrl = adminDatabaseUrl();
 
 const rl = createInterface({ input: process.stdin, output: process.stdout });
 const password = await rl.question(`New password for ${email} (at least ${MIN_PASSWORD} characters, it will be visible): `);
@@ -31,7 +35,7 @@ if (problem) {
   process.exit(1);
 }
 
-const client = new pg.Client({ connectionString: process.env.DATABASE_URL ?? 'postgresql://app:app@localhost:15432/restaurant' });
+const client = new pg.Client({ connectionString: dbUrl });
 await client.connect();
 try {
   await client.query('begin');

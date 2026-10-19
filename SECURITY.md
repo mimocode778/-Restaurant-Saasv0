@@ -18,8 +18,9 @@ software. Keep this file up to date when the login changes.
 | Two-step login | Optional for owners and managers: 6-digit code from a phone app, each code usable once, 10 one-time recovery codes. The phone-app secret is encrypted (AES-256-GCM) with a key the database never sees. |
 | Sessions | End after 12 hours, or 2 hours without use (30 minutes for waiters). Logout, "log out everywhere", password change, disabling a person, unpairing a tablet: all take effect immediately. |
 | Waiter PINs | Only work on a tablet paired by a manager. |
-| Web app cookie | `HttpOnly` (page scripts cannot read it), `SameSite=Strict`, `Secure` in production. Requests that change something must come from an allowed website (cross-site request forgery protection). |
+| Web app cookie | `HttpOnly` (page scripts cannot read it), `SameSite=Strict`, `Secure` and the `__Host-` name in production (no other site can plant or overwrite it). Requests that change something must come from an allowed website (cross-site request forgery protection). |
 | Browser protections | helmet headers, strict list of allowed websites (CORS), HTTPS-only header (HSTS) in production, 100 kB request limit. |
+| Trustworthy sales | The server's clock sets the time of every sale typed at the till (only imported sales keep their own time). Every sale and stock movement records who recorded it. A void, discount or refund must point to the original sale of the same restaurant, and all of them together can never exceed it. The database enforces these rules itself. |
 | Login history | Every login, failure, block, logout, password/PIN/two-step change, tablet pairing and staff change, with address and browser. Append-only: even the admin cannot edit or delete it. Owners and managers see their own restaurant's history. |
 | Production safety checks | The API refuses to start with development passwords, a short database password, unencrypted database traffic, a missing encryption key or a missing/`http://` website list. |
 | Libraries | `pnpm audit` reports no known vulnerability (checked 19 October 2026). Run `pnpm audit` again before each release. |
@@ -41,10 +42,13 @@ software. Keep this file up to date when the login changes.
 
    Generate a key or a password:
    `node -e "console.log(require('crypto').randomBytes(32).toString('base64'))"`
-3. **Database passwords.** Change the development password of the runtime account:
-   `alter role app_runtime password '<long random password>';`
-   Use a different, strong password for the admin account that runs migrations. The
-   API must never use the admin account.
+3. **Database passwords.** Change the development password of the runtime account with
+   `pnpm --filter api set-runtime-password` (it asks for the new password), then put that
+   password in the API's `DATABASE_URL`. In production, `pnpm db:migrate` stops with a
+   "DANGER" message as long as the development password still works. Use a different,
+   strong password for the admin account that runs migrations. The API must never use
+   the admin account. In production every script refuses to run without an explicit
+   `DATABASE_URL`.
 4. **Backups** of the database, encrypted, tested by restoring them once.
 5. **Turn on two-step login** for every owner account.
 6. **Independent review.** Before real money and customer data go in, have a security
