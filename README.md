@@ -3,6 +3,8 @@
 Restaurant management software: till, stock, customers. Money is always counted in
 whole millimes (1 TND = 1000 millimes) so there are no rounding errors.
 
+**New to the project? Read [docs/ONBOARDING.md](docs/ONBOARDING.md) first, then [CONTRIBUTING.md](CONTRIBUTING.md).**
+
 ## First time on a computer
 
 ```bash
