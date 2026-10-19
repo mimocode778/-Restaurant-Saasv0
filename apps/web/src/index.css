@@ -134,3 +134,38 @@ tr.warn td { background: var(--amber-soft); }
   .content { padding: 1rem; }
   .two { grid-template-columns: 1fr; }
 }
+
+/* Dining room: plan and 3D view */
+.segmented { display: inline-flex; background: var(--white); border: 1px solid var(--line); border-radius: 10px; padding: 3px; }
+.segmented button { border: 0; background: transparent; padding: 0.4rem 0.9rem; }
+.segmented button.on { background: var(--blue); color: var(--white); }
+.toolbar { display: flex; gap: 0.4rem; align-items: center; flex-wrap: wrap; margin: 0.75rem 0; }
+.room-layout { display: grid; grid-template-columns: minmax(0, 1fr) 280px; gap: 1rem; align-items: start; }
+.room-stage { background: var(--white); border: 1px solid var(--line); border-radius: var(--radius); overflow: hidden; min-height: 420px; }
+.room-side .panel:first-child { margin-top: 0; }
+.stage-3d { height: min(68vh, 620px); touch-action: none; }
+.stage-loading { display: grid; place-items: center; height: 420px; color: var(--muted); }
+.status-free { color: var(--green); font-weight: 600; }
+.stepper { display: inline-flex; align-items: center; gap: 0.75rem; }
+.stepper button { width: 2.2rem; padding: 0.3rem; font-size: 1.1rem; }
+.stepper span { min-width: 1.5rem; text-align: center; font-weight: 700; }
+.row-gap { display: flex; gap: 0.5rem; flex-wrap: wrap; }
+
+.plan { display: block; width: 100%; height: auto; max-height: 68vh; touch-action: none; user-select: none; background: #eef3f9; }
+.plan-floor { fill: var(--sand); stroke: var(--blue); stroke-width: 6; }
+.plan-grid line { stroke: rgba(29, 79, 145, 0.12); stroke-width: 2; }
+.plan-item circle, .plan-item rect { fill: var(--white); stroke: var(--blue-dark); stroke-width: 3; }
+.plan-item .plan-chair { fill: var(--blue); stroke: none; }
+.plan-item.kind-counter rect { fill: #c99a72; }
+.plan-item.kind-kitchen rect { fill: #c3cad2; }
+.plan-item.kind-plant rect { fill: #7fb77b; }
+.plan-item.kind-door rect { fill: var(--blue); }
+.plan-item text { font-size: 30px; font-weight: 700; fill: var(--blue-dark); pointer-events: none; }
+.plan-item.kind-door text, .plan-item.kind-plant text { font-size: 22px; font-weight: 600; }
+.plan-item.movable { cursor: grab; }
+.plan-item.selected circle:not(.plan-chair), .plan-item.selected rect { stroke: #f2a531; stroke-width: 8; }
+
+@media (max-width: 900px) {
+  .room-layout { grid-template-columns: minmax(0, 1fr); }
+  .stage-3d { height: 55vh; }
+}

@@ -45,6 +45,10 @@ const FR: Record<string, string> = {
   'This name is already used': 'Ce nom est déjà utilisé',
   'This email is already used': 'Cet e-mail est déjà utilisé',
   'Unknown category': 'Catégorie inconnue',
+  'A table already has this name': 'Une table porte déjà ce nom',
+  'This position is outside the room': 'Cette position est en dehors de la salle',
+  'Some items would end up outside the room: move them first': "Certains éléments seraient hors de la salle : déplacez-les d'abord",
+  'No such item in the room': "Cet élément n'est plus dans la salle",
   'Archive or move its dishes first': "Archivez ou déplacez d'abord ses plats",
   'Its category is archived: move the dish first': "Sa catégorie est archivée : déplacez d'abord le plat",
   'No such dish on the menu': 'Ce plat n’est pas à la carte',
@@ -92,3 +96,4 @@ export async function api<T = unknown>(method: string, path: string, body?: unkn
 export const get = <T>(path: string) => api<T>('GET', path)
 export const post = <T>(path: string, body?: unknown) => api<T>('POST', path, body ?? {})
 export const patch = <T>(path: string, body: unknown) => api<T>('PATCH', path, body)
+export const put = <T>(path: string, body: unknown) => api<T>('PUT', path, body)

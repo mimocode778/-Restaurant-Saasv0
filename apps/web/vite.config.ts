@@ -5,6 +5,8 @@ import { defineConfig } from 'vite'
 // (port 3000). For the browser it is all one website, so the protected login cookie works.
 export default defineConfig({
   plugins: [react()],
+  // The 3D view (about 250 kB compressed) is a separate file, loaded only when opened.
+  build: { chunkSizeWarningLimit: 1100 },
   server: {
     port: 5173,
     strictPort: true,

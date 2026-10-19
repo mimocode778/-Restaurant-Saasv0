@@ -60,4 +60,14 @@ pnpm audit                   # check the libraries for known security problems
   `GET /menu/items/:id/prices` (history), `POST /menu/items/:id/archive|restore`.
 - Dishes are archived, never deleted, and a price change never erases the old price.
 
+## Dining room and 3D view
+
+- Page **Salle (3D)**: owners and managers add tables, the counter, the kitchen, plants and
+  doors, then place them on the plan (seen from above) by dragging them.
+- The **3D view** shows the same room: drag to turn around it, scroll or pinch to zoom,
+  click a table to select it. Waiters can see it but not change it.
+- API: `GET /floor`, `PUT /floor/plan`, `POST /floor/items`, `PATCH /floor/items/:id`,
+  `POST /floor/items/:id/archive`. Positions are in centimetres.
+- The 3D view only displays the room. It never records sales (that stays in the till core).
+
 **Read [SECURITY.md](SECURITY.md) before putting the software on a real server.**

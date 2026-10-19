@@ -5,6 +5,7 @@ import { Dashboard } from './pages/Dashboard'
 import { History } from './pages/History'
 import { Login } from './pages/Login'
 import { Menu } from './pages/Menu'
+import { Room } from './pages/Room'
 import { Staff } from './pages/Staff'
 import { Tablets } from './pages/Tablets'
 import { ROLE_FR } from './helpers'
@@ -13,6 +14,7 @@ import { Notice } from './ui'
 // The pages, with who may see them. The API checks the same rules again on every request.
 const PAGES = [
   { path: '', label: 'Accueil', managersOnly: false },
+  { path: 'salle', label: 'Salle (3D)', managersOnly: false },
   { path: 'carte', label: 'Carte et prix', managersOnly: false },
   { path: 'equipe', label: 'Équipe', managersOnly: true },
   { path: 'tablettes', label: 'Tablettes', managersOnly: true },
@@ -95,6 +97,7 @@ export default function App() {
       </aside>
       <main className="content">
         {page.path === '' && <Dashboard me={me} />}
+        {page.path === 'salle' && <Room me={me} />}
         {page.path === 'carte' && <Menu me={me} />}
         {page.path === 'equipe' && <Staff me={me} />}
         {page.path === 'tablettes' && <Tablets />}

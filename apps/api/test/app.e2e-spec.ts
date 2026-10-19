@@ -73,6 +73,7 @@ function http(ip = newIp()) {
     get: (u: string) => wrap(agent.get(u)),
     post: (u: string) => wrap(agent.post(u)),
     patch: (u: string) => wrap(agent.patch(u)),
+    put: (u: string) => wrap(agent.put(u)),
     options: (u: string) => wrap(agent.options(u)),
   };
 }
@@ -429,5 +430,46 @@ describe('menu and prices', () => {
     await http().patch(`/menu/items/${item}`).set(n2).send({ name: 'Volé' }).expect(404);
     await http().post(`/menu/items/${item}/price`).set(n2).send({ priceTtcMillimes: 1, vatRateBp: 0 }).expect(404);
     await http().post('/menu/items').set(n2).send({ categoryId: cat, name: 'Intrus', priceTtcMillimes: 1000, vatRateBp: 1900 }).expect(400);
+  });
+});
+
+describe('dining room layout', () => {
+  it('owners arrange the room, everyone sees it, other restaurants never do', async () => {
+    await createOwner('Resto R', 'r@test.tn');
+    await createOwner('Resto S', 's@test.tn');
+    const owner = bearer(await login('r@test.tn'));
+    const other = bearer(await login('s@test.tn'));
+
+    expect((await http().get('/floor').set(owner).expect(200)).body).toEqual({ widthCm: 1200, depthCm: 800, items: [] });
+    await http().put('/floor/plan').set(owner).send({ widthCm: 1500, depthCm: 900 }).expect(204);
+
+    const { id: t1 } = (await http().post('/floor/items').set(owner).send({ kind: 'table', label: 'T1', seats: 4, xCm: 300, zCm: 200 }).expect(201)).body;
+    await http().post('/floor/items').set(owner).send({ kind: 'table', label: 't1', seats: 2, xCm: 500, zCm: 200 }).expect(409);
+    await http().post('/floor/items').set(owner).send({ kind: 'table', label: 'T9', xCm: 500, zCm: 200 }).expect(400);
+    await http().post('/floor/items').set(owner).send({ kind: 'counter', label: 'Comptoir', seats: 3, xCm: 100, zCm: 100 }).expect(400);
+    await http().post('/floor/items').set(owner).send({ kind: 'plant', label: 'Jasmin', xCm: 2000, zCm: 100 }).expect(400);
+    await http().post('/floor/items').set(owner).send({ kind: 'counter', label: 'Comptoir', xCm: 100, zCm: 800, rotationDeg: 90 }).expect(201);
+
+    await http().patch(`/floor/items/${t1}`).set(owner).send({ xCm: 700, rotationDeg: 45 }).expect(204);
+    // The room cannot shrink under an item.
+    await http().put('/floor/plan').set(owner).send({ widthCm: 600, depthCm: 900 }).expect(409);
+
+    const floor = (await http().get('/floor').set(owner).expect(200)).body;
+    expect(floor.widthCm).toBe(1500);
+    expect(floor.items.find((i: { label: string }) => i.label === 'T1')).toMatchObject({ xCm: 700, rotationDeg: 45, seats: 4 });
+
+    // Another restaurant sees an empty room and cannot touch this one.
+    expect((await http().get('/floor').set(other).expect(200)).body.items).toEqual([]);
+    await http().patch(`/floor/items/${t1}`).set(other).send({ label: 'Volé' }).expect(404);
+
+    // Waiters see the room but cannot move anything.
+    const waiter = (await http().post('/staff').set(owner).send({ fullName: 'Nour', role: 'waiter', pin: '8642' }).expect(201)).body;
+    const { deviceToken } = (await http().post('/auth/devices').set(owner).send({ name: 'Salle' }).expect(201)).body;
+    const asWaiter = bearer((await http().post('/auth/pin-login').set('x-device-token', deviceToken).send({ userId: waiter.id, pin: '8642' }).expect(200)).body.token);
+    expect((await http().get('/floor').set(asWaiter).expect(200)).body.items).toHaveLength(2);
+    await http().patch(`/floor/items/${t1}`).set(asWaiter).send({ xCm: 100 }).expect(403);
+
+    await http().post(`/floor/items/${t1}/archive`).set(owner).expect(204);
+    expect((await http().get('/floor').set(owner).expect(200)).body.items).toHaveLength(1);
   });
 });
