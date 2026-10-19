@@ -35,3 +35,12 @@ export function formatRate(rate: BasisPoints): string {
   const rest = rate % 100;
   return rest === 0 ? `${whole} %` : `${whole},${String(rest).padStart(2, "0").replace(/0$/, "")} %`;
 }
+
+// Reads a rate typed by a person ("19", "7", "13,5", "19 %") into basis points.
+export function parseRate(text: string): BasisPoints | null {
+  const clean = text.trim().replace(/\s|%/g, "").replace(",", ".");
+  const m = /^(\d{1,3})(?:\.(\d{1,2}))?$/.exec(clean);
+  if (!m) return null;
+  const bp = Number(m[1]) * 100 + Number((m[2] ?? "").padEnd(2, "0"));
+  return bp <= 10_000 ? bp : null;
+}

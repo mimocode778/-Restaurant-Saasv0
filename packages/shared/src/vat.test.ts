@@ -42,3 +42,20 @@ describe("showing a rate", () => {
     expect(formatRate(1325)).toBe("13,25 %");
   });
 });
+
+import { parseRate } from "./vat";
+
+describe("reading a rate typed by a person", () => {
+  it.each([
+    ["19", 1900],
+    ["7 %", 700],
+    ["13,5", 1350],
+    ["0", 0],
+  ])("%s -> %i", (text, bp) => {
+    expect(parseRate(text)).toBe(bp);
+  });
+
+  it.each(["", "abc", "101", "-7", "19,123"])("refuses %s", (text) => {
+    expect(parseRate(text)).toBeNull();
+  });
+});

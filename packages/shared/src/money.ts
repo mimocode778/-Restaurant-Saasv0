@@ -51,3 +51,18 @@ export function format(amount: Millimes): string {
   const millimes = String(abs % 1000).padStart(3, "0");
   return `${sign}${dinars},${millimes} TND`;
 }
+
+// Reads an amount typed by a person ("12,500", "12.5", "1 250,750", "8") into millimes.
+// Returns null if it is not a valid, non-negative amount with at most 3 decimals.
+export function parseTnd(text: string): Millimes | null {
+  const clean = text.trim().replace(/\s| |TND|DT/gi, "").replace(",", ".");
+  const m = /^(\d{1,7})(?:\.(\d{1,3}))?$/.exec(clean);
+  if (!m) return null;
+  const millimes = Number(m[1]) * 1000 + Number((m[2] ?? "").padEnd(3, "0"));
+  return Number.isSafeInteger(millimes) ? millimes : null;
+}
+
+// "12,500" (no currency), for filling an input field.
+export function formatTndPlain(amount: Millimes): string {
+  return format(amount).replace(" TND", "");
+}

@@ -14,8 +14,16 @@ pnpm create-owner --restaurant "Chez Ali" --name "Ali Ben Salah" --email ali@exa
 
 ## Every day
 
+Open two Git Bash windows:
+
 ```bash
-pnpm dev:api                 # start the API on http://localhost:3000
+pnpm dev:api                 # window 1: the API on http://localhost:3000
+pnpm dev:web                 # window 2: the website on http://localhost:5173
+```
+
+Then open **http://localhost:5173** in your browser and log in.
+
+```bash
 pnpm test                    # quick tests
 pnpm test:e2e                # full tests over HTTP, on a temporary database
 pnpm audit                   # check the libraries for known security problems

@@ -37,3 +37,27 @@ describe("money", () => {
     expect(format(-1250)).toBe("-1,250 TND");
   });
 });
+
+import { formatTndPlain, parseTnd } from "./money";
+
+describe("reading an amount typed by a person", () => {
+  it.each([
+    ["12,500", 12_500],
+    ["12.5", 12_500],
+    ["12", 12_000],
+    ["0,005", 5],
+    ["1 250,750", 1_250_750],
+    ["8 TND", 8_000],
+    [" 3,2 ", 3_200],
+  ])("%s -> %i millimes", (text, expected) => {
+    expect(parseTnd(text)).toBe(expected);
+  });
+
+  it.each(["", "abc", "-5", "1,2345", "12,5,0", "1e3"])("refuses %s", (text) => {
+    expect(parseTnd(text)).toBeNull();
+  });
+
+  it("writes an amount back for an input field", () => {
+    expect(formatTndPlain(12_500)).toBe("12,500");
+  });
+});
