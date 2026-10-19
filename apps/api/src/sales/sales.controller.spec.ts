@@ -10,6 +10,8 @@ const person = (role: SessionUser['role']): SessionUser => ({
   restaurantId: RESTAURANT,
   role,
   fullName: 'Test',
+  method: role === 'waiter' ? 'pin' : 'password',
+  twoStepEnabled: false,
   expiresAt: new Date(),
 });
 const manager = person('manager');

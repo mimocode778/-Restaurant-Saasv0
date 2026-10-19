@@ -7,9 +7,9 @@
 import { createInterface } from 'node:readline/promises';
 import { parseArgs } from 'node:util';
 import pg from 'pg';
+import { MIN_PASSWORD, passwordProblem } from '../dist/auth/password-policy.js';
 import { hashSecret } from '../dist/auth/secrets.js';
 
-const MIN_PASSWORD = 10;
 const { values } = parseArgs({
   options: { restaurant: { type: 'string' }, name: { type: 'string' }, email: { type: 'string' } },
 });
@@ -24,8 +24,9 @@ if (!restaurant || !name || !email || !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email))
 const rl = createInterface({ input: process.stdin, output: process.stdout });
 const password = await rl.question(`Password for ${email} (at least ${MIN_PASSWORD} characters, it will be visible): `);
 rl.close();
-if (password.length < MIN_PASSWORD) {
-  console.error(`The password needs at least ${MIN_PASSWORD} characters.`);
+const problem = passwordProblem(password, email);
+if (problem) {
+  console.error(`${problem}.`);
   process.exit(1);
 }
 

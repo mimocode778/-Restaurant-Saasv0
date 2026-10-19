@@ -3,12 +3,28 @@ import { Pool, PoolClient } from 'pg';
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
+// Passwords that appear in this project's code. Fine on a developer's PC, never on a server.
+const DEV_PASSWORDS = new Set(['app', 'app_runtime', 'postgres', 'password', '']);
+
 function databaseUrl(): string {
   const url = process.env.DATABASE_URL;
-  if (url) return url;
   if (process.env.NODE_ENV === 'production') {
-    throw new Error('DATABASE_URL must be set in production');
+    if (!url) throw new Error('DATABASE_URL must be set in production');
+    let password = '';
+    try {
+      password = decodeURIComponent(new URL(url).password);
+    } catch {
+      throw new Error('DATABASE_URL is not a valid address');
+    }
+    if (DEV_PASSWORDS.has(password) || password.length < 16) {
+      throw new Error('DATABASE_URL uses a development or short password: set a long random one in production');
+    }
+    if (process.env.DB_SSL !== 'true') {
+      throw new Error('DB_SSL=true is required in production, so database traffic is encrypted');
+    }
+    return url;
   }
+  if (url) return url;
   // Development only. Never used in production.
   return 'postgresql://app_runtime:app_runtime@localhost:15432/restaurant';
 }

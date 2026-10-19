@@ -8,6 +8,7 @@
     "build:shared": "pnpm --filter @app/shared build",
     "test:e2e": "pnpm --filter @app/shared build && pnpm --filter api test:e2e",
     "db:migrate": "pnpm --filter api db:migrate",
-    "create-owner": "pnpm --filter api create-owner"
+    "create-owner": "pnpm --filter api create-owner",
+    "reset-owner-password": "pnpm --filter api reset-owner-password"
   }
 }
