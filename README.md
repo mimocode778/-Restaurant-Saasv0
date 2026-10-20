@@ -72,4 +72,23 @@ pnpm audit                   # check the libraries for known security problems
   `POST /floor/items/:id/archive`. Positions are in centimetres.
 - The 3D view only displays the room. It never records sales (that stays in the till core).
 
+## Stock
+
+- Page **Stock** (owners and managers only; waiters have no access).
+- Stock works like a bank statement: every delivery, usage, waste and stocktake is a new
+  line in an append-only journal; the quantity shown is the sum of the lines.
+- Quantities are whole numbers in a **base unit**: grams (`g`), millilitres (`ml`) or
+  pieces (`piece`). The screens show kg and L: 1.5 kg is `1500`. A product's unit never changes.
+- **Pack sizes** ("Caisse de 12 x 1 L" = `12000` ml) let a delivery be typed as "2 crates".
+- A delivery can carry its **price before VAT** (`costMillimes`), used for the estimated
+  stock value (quantity x last price) and the cost in the report.
+- A **stocktake** sends the counted quantities; the database records the difference.
+- Stock may go below zero (the answer says `belowZero: true`) so a missing delivery never
+  blocks the kitchen; the screen warns instead.
+- API: `GET /stock/items`, `GET /stock/items/:id`, `POST /stock/items`, `PATCH /stock/items/:id`,
+  `POST /stock/items/:id/archive|restore`, `POST /stock/items/:id/packs`,
+  `POST /stock/items/:id/packs/:packId/archive`, `POST /stock/items/:id/movements`
+  (`purchase`, `usage`, `waste` with a `reason`), `GET /stock/items/:id/movements`,
+  `POST /stock/counts`, `GET /stock/report?from=2026-10-13&to=2026-10-20`.
+
 **Read [SECURITY.md](SECURITY.md) before putting the software on a real server.**

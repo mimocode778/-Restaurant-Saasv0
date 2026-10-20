@@ -140,6 +140,15 @@ tr.warn td { background: var(--amber-soft); }
 .segmented button { border: 0; background: transparent; padding: 0.4rem 0.9rem; }
 .segmented button.on { background: var(--blue); color: var(--white); }
 .toolbar { display: flex; gap: 0.4rem; align-items: center; flex-wrap: wrap; margin: 0.75rem 0; }
+.toolbar .field { margin: 0; }
+.count-input { width: 7rem; text-align: right; }
+.count-table { table-layout: fixed; }
+.count-table th:first-child { width: 40%; }
+.stock-actions { white-space: normal; width: 19rem; }
+.stock-actions > div { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 0.3rem; }
+.stock-actions button { margin-left: 0; }
+.tag { white-space: nowrap; }
+.stat .muted.small { display: block; margin-top: 0.2rem; }
 .room-layout { display: grid; grid-template-columns: minmax(0, 1fr) 280px; gap: 1rem; align-items: start; }
 .room-stage { background: var(--white); border: 1px solid var(--line); border-radius: var(--radius); overflow: hidden; min-height: 420px; }
 .room-side .panel:first-child { margin-top: 0; }
@@ -168,4 +177,7 @@ tr.warn td { background: var(--amber-soft); }
 @media (max-width: 900px) {
   .room-layout { grid-template-columns: minmax(0, 1fr); }
   .stage-3d { height: 55vh; }
+}
+@media (max-width: 700px) {
+  .stock-actions { width: auto; min-width: 12rem; }
 }

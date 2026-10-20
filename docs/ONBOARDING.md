@@ -23,12 +23,12 @@ what comes next. Read it once before your first change.
 | Sales (basic) | 🟡 Started | Recording a sale (server time, who recorded it) and refunds linked to their sale; the day's totals. No till screen yet. |
 | **Till (caisse)** | ⏳ Waiting | Blocked on the official specification, see section 6. |
 | Offline mode | ⏳ To do | The till must keep working when the internet drops. |
-| Stock | ⏳ To do | Tables exist (`stock_items`, `stock_movements`), no screens or API yet. |
+| Stock | ✅ First version | Products by storage place, alert levels, pack sizes, deliveries with price, waste with a reason, stocktakes, report "what was used between two dates", estimated stock value. Owners and managers only. Not yet: recipes and automatic deduction from sales (waits for the till). |
 | CRM (customers, loyalty) | ⏳ To do | Check Tunisian personal-data rules before storing customer data. |
 | 3D game layer | ⏳ To do | Characters, animations, live table status, team challenges. |
 | Hosting / production | ⏳ To do | Checklist in `SECURITY.md`. |
 
-Tests: about 180 automatic checks (`pnpm test`, `pnpm test:e2e`), and `pnpm audit` reports
+Tests: about 215 automatic checks (`pnpm test`, `pnpm test:e2e`), and `pnpm audit` reports
 no known vulnerability.
 
 ---
@@ -69,6 +69,7 @@ restaurant-saas/
 │
 ├── packages/shared/src/   Shared by the API and the website
 │   ├── money.ts           Millimes: add, multiply, split, format "12,500 TND", parse "12,5"
+│   ├── quantity.ts        Stock quantities: grams/ml/pieces, format "1,5 kg", parse "1,5"
 │   └── vat.ts             VAT rates in basis points (19 % = 1900), split price incl. VAT
 │
 ├── apps/api/              The server
@@ -78,7 +79,9 @@ restaurant-saas/
 │   │   ├── 003_auth.sql             Passwords, PINs, tablets, sessions (secret tables)
 │   │   ├── 004_auth_hardening.sql   Attempt limits, login history, two-step, idle timeout
 │   │   ├── 005_menu.sql             Categories, dishes, append-only price history
-│   │   └── 006_floor.sql            Dining room size and items (tables, counter...)
+│   │   ├── 006_floor.sql            Dining room size and items (tables, counter...)
+│   │   ├── 007_sales_trust.sql      Server time and author on sales, refunds linked to their sale
+│   │   └── 008_stock.sql            Stock: pack sizes, prices, waste reasons, stocktakes
 │   ├── scripts/           migrate, create-owner, reset-owner-password
 │   ├── src/
 │   │   ├── main.ts / app.module.ts / app.setup.ts   Start-up, security headers, CORS
@@ -89,7 +92,8 @@ restaurant-saas/
 │   │   ├── staff/         Team management
 │   │   ├── menu/          Menu and prices
 │   │   ├── floor/         Dining room layout
-│   │   └── sales/         Sales events and day summary
+│   │   ├── sales/         Sales events and day summary
+│   │   └── stock/         Stock products, movements, stocktakes, report
 │   └── test/app.e2e-spec.ts   Full HTTP tests on a temporary database
 │
 └── apps/web/              The website
@@ -99,7 +103,7 @@ restaurant-saas/
         ├── api.ts         Calls to the API + French error messages
         ├── floor.ts       Room geometry shared by the plan and the 3D view
         ├── ui.tsx / helpers.ts   Small components and helpers
-        └── pages/         Login, Dashboard, Menu, Staff, Tablets, History, Account,
+        └── pages/         Login, Dashboard, Menu, Stock, Staff, Tablets, History, Account,
                            Room (plan editor), Room3D (3D view, loaded on demand)
 ```
 
@@ -167,8 +171,9 @@ documents. **Do not build till/ticket features before we have them.**
 1. Till core, built to the official specification, with offline mode and the link to the
    Ministry (integration tests on the homologation portal).
 2. Hosting online (HTTPS, backups, monitoring) and a pilot with 1–2 restaurants.
-3. Stock, then the CRM.
+3. Stock phase 2 (recipes, automatic deduction from sales, food cost), then the CRM.
 4. 3D game layer: live table status, staff characters, animations, team challenges.
 
-Good first tasks while waiting for the specification: stock API and screens, tests on a
-real tablet for the 3D view, editing an owner's name from the screens.
+Good first tasks while waiting for the specification: recipe cards for dishes (without
+automatic deduction yet), tests on a real tablet for the 3D view and the stock screens,
+editing an owner's name from the screens.

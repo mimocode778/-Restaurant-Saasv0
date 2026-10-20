@@ -509,3 +509,91 @@ describe('trustworthy sales', () => {
     await http().post('/sales').set(y2).send({ kind: 'refund', amountMillimes: -1_000, refersTo: id }).expect(400);
   });
 });
+
+describe('stock', () => {
+  it('owners and managers manage stock: products, deliveries in packs, waste, stocktake, report', async () => {
+    await createOwner('Resto S', 'stock-owner@test.tn');
+    const owner = bearer(await login('stock-owner@test.tn'));
+
+    const { id: mozza } = (
+      await http().post('/stock/items').set(owner).send({ name: 'Mozzarella', baseUnit: 'g', storagePlace: 'fridge', alertLevelBase: 5_000 }).expect(201)
+    ).body;
+    await http().post('/stock/items').set(owner).send({ name: 'MOZZARELLA', baseUnit: 'g' }).expect(409);
+    // Quantities are whole numbers in the base unit; unknown fields are refused.
+    await http().post('/stock/items').set(owner).send({ name: 'Bad', baseUnit: 'kg' }).expect(400);
+    await http().post('/stock/items').set(owner).send({ name: 'Bad', baseUnit: 'g', alertLevelBase: 1.5 }).expect(400);
+    await http().post('/stock/items').set(owner).send({ name: 'Bad', baseUnit: 'g', restaurantId: 'x' }).expect(400);
+    // The unit cannot be changed.
+    await http().patch(`/stock/items/${mozza}`).set(owner).send({ baseUnit: 'ml' }).expect(400);
+
+    const { id: carton } = (await http().post(`/stock/items/${mozza}/packs`).set(owner).send({ name: 'Carton de 5 kg', quantityBase: 5_000 }).expect(201)).body;
+    const delivery = (
+      await http().post(`/stock/items/${mozza}/movements`).set(owner).send({ kind: 'purchase', packId: carton, packCount: 2, costMillimes: 180_000 }).expect(201)
+    ).body;
+    expect(delivery).toMatchObject({ quantityBase: 10_000, stockAfterBase: 10_000, belowAlert: false, belowZero: false });
+
+    // No time and no author can be sent: the server sets both.
+    await http().post(`/stock/items/${mozza}/movements`).set(owner).send({ kind: 'usage', quantityBase: 100, occurredAt: '2020-01-01' }).expect(400);
+    await http().post(`/stock/items/${mozza}/movements`).set(owner).send({ kind: 'usage', quantityBase: 100, recordedBy: mozza }).expect(400);
+    // Quantities are positive; waste needs a reason; a delivery is a quantity OR packs.
+    await http().post(`/stock/items/${mozza}/movements`).set(owner).send({ kind: 'usage', quantityBase: -100 }).expect(400);
+    await http().post(`/stock/items/${mozza}/movements`).set(owner).send({ kind: 'waste', quantityBase: 100 }).expect(400);
+    await http().post(`/stock/items/${mozza}/movements`).set(owner).send({ kind: 'purchase', quantityBase: 100, packId: carton, packCount: 1 }).expect(400);
+    await http().post(`/stock/items/${mozza}/movements`).set(owner).send({ kind: 'count_adjustment', quantityBase: 100 }).expect(400);
+
+    const waste = (await http().post(`/stock/items/${mozza}/movements`).set(owner).send({ kind: 'waste', quantityBase: 6_000, reason: 'expired' }).expect(201)).body;
+    expect(waste).toMatchObject({ quantityBase: -6_000, stockAfterBase: 4_000, belowAlert: true });
+
+    const count = (await http().post('/stock/counts').set(owner).send({ lines: [{ stockItemId: mozza, countedBase: 3_500 }], note: 'Lundi' }).expect(200)).body;
+    expect(count).toEqual([{ stockItemId: mozza, countedBase: 3_500, differenceBase: -500 }]);
+
+    const items = (await http().get('/stock/items').set(owner).expect(200)).body;
+    expect(items[0]).toMatchObject({ name: 'Mozzarella', quantityBase: 3_500, belowAlert: true, estimatedValueMillimes: 63_000 });
+    const history = (await http().get(`/stock/items/${mozza}/movements`).set(owner).expect(200)).body;
+    expect(history.map((h: { kind: string }) => h.kind)).toEqual(['count_adjustment', 'waste', 'purchase']);
+    expect(history[2]).toMatchObject({ packName: 'Carton de 5 kg', packCount: 2, recordedBy: 'Owner' });
+
+    const day = new Intl.DateTimeFormat('en-CA', { timeZone: 'Africa/Tunis' }).format(new Date());
+    const report = (await http().get(`/stock/report?from=${day}&to=${day}`).set(owner).expect(200)).body;
+    expect(report[0]).toMatchObject({ purchasedBase: 10_000, purchaseCostMillimes: 180_000, wastedBase: 6_000, usedBase: 500, closingBase: 3_500 });
+    await http().get('/stock/report?from=yesterday&to=today').set(owner).expect(400);
+
+    // Archived products leave the list and accept no movement.
+    await http().post(`/stock/items/${mozza}/archive`).set(owner).expect(204);
+    expect((await http().get('/stock/items').set(owner).expect(200)).body).toEqual([]);
+    await http().post(`/stock/items/${mozza}/movements`).set(owner).send({ kind: 'usage', quantityBase: 1 }).expect(409);
+    await http().post(`/stock/items/${mozza}/restore`).set(owner).expect(204);
+  });
+
+  it('waiters have no access to stock', async () => {
+    await createOwner('Resto T', 'stock-waiter@test.tn');
+    const owner = bearer(await login('stock-waiter@test.tn'));
+    const { id: item } = (await http().post('/stock/items').set(owner).send({ name: 'Café', baseUnit: 'g' }).expect(201)).body;
+    const waiter = (await http().post('/staff').set(owner).send({ fullName: 'Rim', role: 'waiter', pin: '1357' }).expect(201)).body;
+    const { deviceToken } = (await http().post('/auth/devices').set(owner).send({ name: 'Bar' }).expect(201)).body;
+    const asWaiter = bearer((await http().post('/auth/pin-login').set('x-device-token', deviceToken).send({ userId: waiter.id, pin: '1357' }).expect(200)).body.token);
+
+    await http().get('/stock/items').set(asWaiter).expect(403);
+    await http().post('/stock/items').set(asWaiter).send({ name: 'Nope', baseUnit: 'g' }).expect(403);
+    await http().post(`/stock/items/${item}/movements`).set(asWaiter).send({ kind: 'waste', quantityBase: 1, reason: 'dropped' }).expect(403);
+    await http().post('/stock/counts').set(asWaiter).send({ lines: [{ stockItemId: item, countedBase: 0 }] }).expect(403);
+    await http().get('/stock/items').expect(401);
+  });
+
+  it('another restaurant cannot see or change this stock', async () => {
+    await createOwner('Resto U1', 'stock-u1@test.tn');
+    await createOwner('Resto U2', 'stock-u2@test.tn');
+    const u1 = bearer(await login('stock-u1@test.tn'));
+    const u2 = bearer(await login('stock-u2@test.tn'));
+    const { id: item } = (await http().post('/stock/items').set(u1).send({ name: 'Safran', baseUnit: 'g' }).expect(201)).body;
+    const { id: pack } = (await http().post(`/stock/items/${item}/packs`).set(u1).send({ name: 'Boîte', quantityBase: 10 }).expect(201)).body;
+
+    expect((await http().get('/stock/items').set(u2).expect(200)).body).toEqual([]);
+    await http().get(`/stock/items/${item}`).set(u2).expect(404);
+    await http().patch(`/stock/items/${item}`).set(u2).send({ name: 'Volé' }).expect(404);
+    await http().post(`/stock/items/${item}/movements`).set(u2).send({ kind: 'usage', quantityBase: 1 }).expect(404);
+    await http().post(`/stock/items/${item}/packs/${pack}/archive`).set(u2).expect(404);
+    await http().post('/stock/counts').set(u2).send({ lines: [{ stockItemId: item, countedBase: 0 }] }).expect(404);
+    await http().get(`/stock/items/${item}/movements`).set(u2).expect(404);
+  });
+});

@@ -64,6 +64,15 @@ const FR: Record<string, string> = {
   'Wrong password or code': 'Mot de passe ou code incorrect',
   'Two-step login is already on': 'La double vérification est déjà activée',
   'Log in with your email and password to do this': 'Connectez-vous avec e-mail et mot de passe pour faire cela',
+  'No such product in stock': 'Ce produit n’est pas dans le stock',
+  'No such archived product': 'Ce produit n’est pas archivé',
+  'This product is archived': 'Ce produit est archivé : réactivez-le d’abord',
+  'Unknown pack size for this product': 'Ce format de livraison n’existe pas pour ce produit',
+  'Unknown product or pack size': 'Produit ou format de livraison inconnu',
+  'No such pack size': 'Ce format de livraison n’existe plus',
+  'A product appears twice in this count': 'Un produit apparaît deux fois dans cet inventaire',
+  'The first day must be before the last day': 'La date de début doit être avant la date de fin',
+  'The quantity must be more than zero': 'La quantité doit être supérieure à zéro',
 }
 function translate(m: string): string {
   return FR[m] ?? m
